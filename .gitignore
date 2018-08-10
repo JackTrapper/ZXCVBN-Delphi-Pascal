@@ -9,3 +9,4 @@ bin/dunitx-results.txt
 *.stat
 *.jdbg
 gui-example/ZxcvbnDemo_project.tvsconfig
+__history
