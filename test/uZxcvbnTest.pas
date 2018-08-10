@@ -221,18 +221,9 @@ uses
   System.SysUtils,
   System.Generics.Collections,
   Zxcvbn,
-  Zxcvbn.Matcher,
   Zxcvbn.PasswordScoring,
   Zxcvbn.Utility,
-  Zxcvbn.Translation,
-  Zxcvbn.DateMatcher,
-  Zxcvbn.DictionaryMatcher,
-  Zxcvbn.L33tMatcher,
-  Zxcvbn.RegexMatcher,
-  Zxcvbn.RepeatMatcher,
-  Zxcvbn.SequenceMatcher,
-  Zxcvbn.SpatialMatcher,
-  Zxcvbn.Result;
+  Zxcvbn.Translation;
 
 procedure TZxcvbnTest.Setup;
 begin
@@ -594,12 +585,12 @@ end;
 
 procedure TZxcvbnTest.BinomialTest;
 begin
-  Assert.AreEqual(1, Zxcvbn.PasswordScoring.Binomial(0, 0));
-  Assert.AreEqual(1, Zxcvbn.PasswordScoring.Binomial(1, 0));
-  Assert.AreEqual(0, Zxcvbn.PasswordScoring.Binomial(0, 1));
-  Assert.AreEqual(1, Zxcvbn.PasswordScoring.Binomial(1, 1));
-  Assert.AreEqual(56, Zxcvbn.PasswordScoring.Binomial(8, 3));
-  Assert.AreEqual(2598960, Zxcvbn.PasswordScoring.Binomial(52, 5));
+  Assert.AreEqual(1, Zxcvbn.Binomial(0, 0));
+  Assert.AreEqual(1, Zxcvbn.Binomial(1, 0));
+  Assert.AreEqual(0, Zxcvbn.Binomial(0, 1));
+  Assert.AreEqual(1, Zxcvbn.Binomial(1, 1));
+  Assert.AreEqual(56, Zxcvbn.Binomial(8, 3));
+  Assert.AreEqual(2598960, Zxcvbn.Binomial(52, 5));
 end;
 
 procedure TZxcvbnTest.DictionaryTest;

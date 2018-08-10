@@ -32,8 +32,7 @@ implementation
 
 { TDebouncedEvent }
 
-constructor TDebouncedEvent.Create(AOwner: TComponent;
-  ASourceEvent: TNotifyEvent; AInterval: integer);
+constructor TDebouncedEvent.Create(AOwner: TComponent; ASourceEvent: TNotifyEvent; AInterval: integer);
 begin
   inherited Create(AOwner);
   self.FSourceEvent := ASourceEvent;
@@ -47,16 +46,18 @@ end;
 
 procedure TDebouncedEvent.DebouncedEvent(Sender: TObject);
 var
-  Between: int64;
+  Between: Int64;
 begin
   Between := MilliSecondsBetween(Now, self.FLastcallTimestamp);
 
   // if timer is not enabled, it means that last call happened
   // earlier than <self.FInteval> milliseconds ago
-  if Between >= self.FInterval then begin
+  if Between >= self.FInterval then
+  begin
     self.DoCallEvent(Sender);
   end
-  else begin
+  else
+  begin
     // adjusting timer, so interval between calls will never be more than <FInterval> ms
     self.FTimer.Interval := self.FInterval - Between;
 

@@ -33,9 +33,6 @@ implementation
 {$R *.dfm}
 {$R Dictionaries.res}
 
-uses
-  Zxcvbn.Result;
-
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   FZxcvbn := TZxcvbn.Create;
@@ -83,10 +80,10 @@ begin
 			'Calculation runtime: '+IntToStr(res.CalcTime)+' ms'+#13#10+#13#10+
 
 			'Guess times: '+#13#10+
-			' • 100 / hour:   '+res.CrackTimeDisplay_OnlineThrottling+' (throttling online attack)'+#13#10+
-			' • 10  / second: '+res.CrackTimeDisplay_OnlineNoThrottling+' (unthrottled online attack)'+#13#10+
-			' • 10k / second: '+res.CrackTimeDisplay_OfflineSlowHashing+' (offline attack, slow hash, many cores)'+#13#10+
-			' • 100 / hour:   '+res.CrackTimeDisplay_OfflineFastHashing+' (offline attack, fast hash, many cores)';
+			' • 100 / hour:   '+res.CrackTimeOnlineThrottlingDisplay+' (throttling online attack)'+#13#10+
+			' • 10  / second: '+res.CrackTimeOnlineNoThrottlingDisplay+' (unthrottled online attack)'+#13#10+
+			' • 10k / second: '+res.CrackTimeOfflineSlowHashDisplay+' (offline attack, slow hash, many cores)'+#13#10+
+			' • 100 / hour:   '+res.CrackTimeOfflineFastHashDisplay+' (offline attack, fast hash, many cores)';
 
 	s := s+#13#10+#13#10+
 			'Warning: ' + #10 +
