@@ -90,6 +90,7 @@ interface
 			- Localized ScoreText
 			- Merged everything into one unit (Zxcvbn.pas)
 			- Moved some purely internal classes and interfaces into the implementation section (don't expose your internal details)
+			- Pass unsecure password around as const to minimize the chance of a duplicate being made in memory
 	Version 1.1   8/11/2018
 			- Removed duplicated words from dictionaries
 			- Removed unused variable
@@ -167,7 +168,7 @@ type
 		/// </summary>
 		/// <param name="APassword">Password</param>
 		/// <param name="AMatches">Matches list</param>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 	/// <summary>
@@ -214,7 +215,7 @@ type
 		/// <param name="APassword">Password being evaluated</param>
 		/// <param name="AMatches">List of matches found against the password</param>
 		/// <returns>A result object for the lowest entropy match sequence</returns>
-		function FindMinimumEntropyMatch(APassword: string; AMatches: TList<TZxcvbnMatch>): TZxcvbnResult;
+		function FindMinimumEntropyMatch(const APassword: string; AMatches: TList<TZxcvbnMatch>): TZxcvbnResult;
 
 		function GetLongestMatch(const AMatchSequence: TList<TZxcvbnMatch>): TZxcvbnMatch;
 		procedure GetMatchFeedback(const AMatch: TZxcvbnMatch; AIsSoleMatch: Boolean; LocaleName: string; out WarningText: string; out SuggestionsText: string);
@@ -243,7 +244,7 @@ type
 		/// <param name="APassword">Password</param>
 		/// <param name="AUserInputs">Optionally, a string list of user data</param>
 		/// <returns>Result for lowest entropy match</returns>
-		function EvaluatePassword(APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
+		function EvaluatePassword(const APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
 
 		/// <summary>
 		/// <para>A class function to match a password against the default matchers without having to create
@@ -255,7 +256,7 @@ type
 		/// <param name="ADictionariesPath">optionally, dictionary files path</param>
 		/// <param name="AUserInputs">optionally, the user inputs list</param>
 		/// <returns>The results of the password evaluation</returns>
-		class function MatchPassword(APassword: string; ADictionariesPath: string = ''; AUserInputs: TStringList = nil): TZxcvbnResult;
+		class function MatchPassword(const APassword: string; ADictionariesPath: string = ''; AUserInputs: TStringList = nil): TZxcvbnResult;
 
 		property LocaleName: string read FLocaleName write FLocaleName;
 	end;
@@ -310,6 +311,8 @@ type
 		/// <summary>Where a date with separators is matched, this will contain the separator that was used (e.g. '/', '-')</summary>
 		Separator: string;
 
+		destructor Destroy; override;
+
 		procedure CopyTo(AMatch: TZxcvbnDateMatch);
 	end;
 
@@ -334,6 +337,8 @@ type
 
 		/// <summary>Additional entropy for this match from the use of mixed case</summary>
 		UppercaseEntropy: Double;
+
+		destructor Destroy; override;
 
 		procedure CopyTo(AMatch: TZxcvbnDictionaryMatch);
 	end;
@@ -564,16 +569,20 @@ begin
 		Languages have many variants:
 
 		 - German:  de-AT, de-CH, de-DE, de-LI, de-LU
-		 - French:  fr-029, fr-BE, fr-CA, fr-CD, fr-CH, fr-CI, fr-CM, fr-FR, fr-HT, fr-LU, fr-MA, fr-MC, fr-ML, fr-RE, fr-SN
-		 - English: en-029, en-AU, en-BZ, en-CA, en-GB, en-HK, en-ID, en-IE, en-IN, en-JM, en-MY, en-NZ, en-PH, en-SG, en-TT, en-US, en-ZA, en-ZW
+		 - French:  fr-BE, fr-CA, fr-CD, fr-CH, fr-CI, fr-CM, fr-FR, fr-HT, fr-LU, fr-MA, fr-MC, fr-ML, fr-RE, fr-SN, fr-029 (029 = Caribbean)
+		 - English: en-AU, en-BZ, en-CA, en-GB, en-HK, en-ID, en-IE, en-IN, en-JM, en-MY, en-NZ, en-PH, en-SG, en-TT, en-US, en-ZA, en-ZW, en-029 (029 = Caribbean)
 
-		Nobody will ever add any other languages to Zxcvbn.
-		And they certainly won't add different sub-variants of German, French, or English.
-		So we're safe simply falling back parent language of the locale.
+		Nobody will ever add any other languages to this Zxcvbn implementation.
+		And they certainly won't add different sub-variants of German, French, or English. (e.g. "fr-CA" as opposed to "fR-FR")
 
-			en-US --> en (English)
+		So we're safe simply falling back parent language of the locale:
+
 			de-DE --> de (Deutsch)
 			fr-FR --> fr (Français)
+			fr-CA --> fr (Français)
+			en-US --> en (English)
+			en-GB --> en (English)
+			en-CA --> en (English)
 	}
 	parentLanguage := GetLocaleStrEx(LocaleName, LOCALE_SPARENT, 'en');
 
@@ -588,7 +597,7 @@ begin
 			end;
 		end;
 		if IsDebuggerPresent then
-			OutputDebugString(PChar('No deDE translaction for "' + AMatcher + '"'));
+			OutputDebugString(PChar('No '+parentLanguage+' translaction for "' + AMatcher + '"'));
 	end
 	else if SameText(parentLanguage, 'fr') then
 	begin
@@ -601,7 +610,7 @@ begin
 			end;
 		end;
 		if IsDebuggerPresent then
-			OutputDebugString(PChar('No frFR translaction for "' + AMatcher + '"'));
+			OutputDebugString(PChar('No '+parentLanguage+' translaction for "' + AMatcher + '"'));
 	end;
 end;
 
@@ -878,7 +887,7 @@ const
 /// </summary>
 /// <param name="password">THe password to evaluate</param>
 /// <returns>An estimation of the cardinality of charactes for this password</returns>
-function PasswordCardinality(APassword: string): Integer;
+function PasswordCardinality(const APassword: string): Integer;
 var
 	cl: Integer;
 	i: Integer;
@@ -1085,7 +1094,7 @@ type
 		/// <param name="APassword">The password to match</param>
 		/// <param name="AMatches"></param>
 		/// <seealso cref="TZxcvbnDictionaryMatch"/>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 	/// <summary>
@@ -1126,7 +1135,7 @@ type
 		/// <param name="APassword">The password to check</param>
 		/// <param name="AMatches"></param>
 		/// <seealso cref="TZxcvbnL33tMatch"/>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 	TZxcvbnSplitsArr = array [0 .. 1] of Integer;
@@ -1169,7 +1178,7 @@ type
 		/// <param name="APassword">The passsword to check</param>
 		/// <param name="AMatches"></param>
 		/// <seealso cref="TZxcvbnDateMatch"/>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 
 		constructor Create;
 		destructor Destroy; override;
@@ -1227,12 +1236,7 @@ type
 		function GetAlignedAdjacent(Ac: TZxcvbnPoint): TZxcvbnPoints;
 		procedure BuildGraph(ALayout: string; ASlanted: Boolean; ATokenSize: Integer);
 	public
-		property Name: string read FName;
-		property StartingPositions: Integer read FStartingPositions;
-		property AverageDegree: Double read FAverageDegree;
-
 		constructor Create(AName: string; ALayout: string; ASlanted: Boolean; ATokenSize: Integer);
-
 		destructor Destroy; override;
 
 		/// <summary>
@@ -1252,6 +1256,10 @@ type
 		/// Calculate entropy for a math that was found on this adjacency graph
 		/// </summary>
 		function CalculateEntropy(AMatchLength: Integer; ATurns: Integer; AShiftedCount: Integer): Double;
+
+		property Name: string read FName;
+		property StartingPositions: Integer read FStartingPositions;
+		property AverageDegree: Double read FAverageDegree;
 	end;
 
 	/// <summary>
@@ -1271,21 +1279,21 @@ type
 		/// <param name="AGraph">Adjacency graph for this key layout</param>
 		/// <param name="APassword">Password to match</param>
 		/// <param name="AMatches"></param>
-		procedure SpatialMatch(AGraph: TZxcvbnSpatialGraph; APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure SpatialMatch(AGraph: TZxcvbnSpatialGraph; const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 
 		// In the JS version these are precomputed, but for now we'll generate them here when they are first needed.
 		function GenerateSpatialGraphs: TObjectList<TZxcvbnSpatialGraph>;
 	public
+		constructor Create;
+		destructor Destroy; override;
+
 		/// <summary>
 		/// Match the password against the known keyboard layouts and adds matches to AMatches
 		/// </summary>
 		/// <param name="APassword">Password to match</param>
 		/// <param name="AMatches"></param>
 		/// <seealso cref="TZxcvbnSpatialMatch"/>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
-
-		constructor Create;
-		destructor Destroy; override;
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 
@@ -1304,7 +1312,7 @@ type
 		/// <param name="APassword">The password to check</param>
 		/// <param name="AMatches"></param>
 		/// <seealso cref="TZxcvbnRepeatMatch"/>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 type
@@ -1346,7 +1354,7 @@ type
 		/// </summary>
 		/// <param name="APassword">The password to check</param>
 		/// <param name="AMatches"></param>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 type
@@ -1374,7 +1382,7 @@ type
 		/// <param name="APassword">The password to check</param>
 		/// <param name="AMatches"></param>
 		/// <seealso cref="SequenceMatch"/>
-		procedure MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+		procedure MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 	end;
 
 
@@ -1390,7 +1398,7 @@ begin
 	FMatcherFactory := AMatcherFactory;
 end;
 
-function TZxcvbn.FindMinimumEntropyMatch(APassword: string; AMatches: TList<TZxcvbnMatch>): TZxcvbnResult;
+function TZxcvbn.FindMinimumEntropyMatch(const APassword: string; AMatches: TList<TZxcvbnMatch>): TZxcvbnResult;
 var
 	bruteforce_cardinality: Integer;
 	minimumEntropyToIndex: array of Double;
@@ -1607,7 +1615,7 @@ begin
 		AMatch.GetMatchFeedback(AIsSoleMatch, LocaleName, {out}WarningText, {out}SuggestionsText);
 end;
 
-function TZxcvbn.EvaluatePassword(APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
+function TZxcvbn.EvaluatePassword(const APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
 var
 	matches: TList<TZxcvbnMatch>;
 	Matcher: IZxcvbnMatcher;
@@ -1635,7 +1643,7 @@ begin
 	Result := res;
 end;
 
-class function TZxcvbn.MatchPassword(APassword: string; ADictionariesPath: string = ''; AUserInputs: TStringList = nil): TZxcvbnResult;
+class function TZxcvbn.MatchPassword(const APassword: string; ADictionariesPath: string = ''; AUserInputs: TStringList = nil): TZxcvbnResult;
 var
 	zx: TZxcvbn;
 begin
@@ -2040,7 +2048,7 @@ begin
 	Result := Subs;
 end;
 
-procedure TZxcvbnL33tMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnL33tMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	addMatch: TZxcvbnL33tMatch;
 	matches: TList<TZxcvbnMatch>;
@@ -2128,6 +2136,13 @@ begin
 	AMatch.DictionaryName := Self.DictionaryName;
 	AMatch.BaseEntropy := Self.BaseEntropy;
 	AMatch.UppercaseEntropy := Self.UppercaseEntropy;
+end;
+
+destructor TZxcvbnDictionaryMatch.Destroy;
+begin
+	BurnString({var}MatchedWord);
+
+	inherited;
 end;
 
 procedure TZxcvbnDictionaryMatch.GetMatchFeedback(AIsSoleMatch: Boolean; LocaleName: string;
@@ -2268,7 +2283,7 @@ begin
 	AMatch.Entropy := AMatch.BaseEntropy + AMatch.UppercaseEntropy;
 end;
 
-procedure TZxcvbnDictionaryMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnDictionaryMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	passwordLower: string;
 	addMatch: TZxcvbnDictionaryMatch;
@@ -2324,6 +2339,17 @@ begin
 	AMatch.month := Self.month;
 	AMatch.day := Self.day;
 	AMatch.Separator := Self.Separator;
+end;
+
+destructor TZxcvbnDateMatch.Destroy;
+begin
+	//Burn
+	year := 0;
+	month := 0;
+	day := 0;
+	BurnString({var}Separator);
+
+	inherited;
 end;
 
 procedure TZxcvbnDateMatch.GetMatchFeedback(AIsSoleMatch: Boolean; LocaleName: string;
@@ -2537,7 +2563,7 @@ begin
 		Result := AYear + 2000;
 end;
 
-procedure TZxcvbnDateMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnDateMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	addMatch: TZxcvbnDateMatch;
 	matches: TList<TZxcvbnMatch>;
@@ -2980,11 +3006,11 @@ begin
 	inherited;
 end;
 
-procedure TZxcvbnSpatialMatcher.SpatialMatch(AGraph: TZxcvbnSpatialGraph; APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnSpatialMatcher.SpatialMatch(AGraph: TZxcvbnSpatialGraph; const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	i, j: Integer;
-	Turns: Integer;
-	ShiftedCount: Integer;
+	turns: Integer;
+	shiftedCount: Integer;
 	lastDirection: Integer;
 	shifted: Boolean;
 	addMatch: TZxcvbnSpatialMatch;
@@ -2996,8 +3022,8 @@ begin
 		i := 0;
 		while (i < APassword.Length - 1) do
 		begin
-			Turns := 0;
-			ShiftedCount := 0;
+			turns := 0;
+			shiftedCount := 0;
 			lastDirection := -1;
 
 			j := i + 1;
@@ -3009,10 +3035,10 @@ begin
 				begin
 					// Spatial match continues
 					if shifted then
-						Inc(ShiftedCount);
+						Inc(shiftedCount);
 					if (lastDirection <> foundDirection) then
 					begin
-						Inc(Turns);
+						Inc(turns);
 						lastDirection := foundDirection;
 					end;
 				end
@@ -3028,12 +3054,12 @@ begin
 				addMatch := TZxcvbnSpatialMatch.Create;
 				addMatch.Pattern := SpatialPattern;
 				addMatch.i := i;
-				addMatch.j := j - 1;
-				addMatch.Token := APassword.Substring(i, j - i);
+				addMatch.j := j-1;
+				addMatch.Token := APassword.Substring(i, j-i);
 				addMatch.Graph := AGraph.Name;
-				addMatch.Entropy := AGraph.CalculateEntropy(j - i, Turns, ShiftedCount);
-				addMatch.Turns := Turns;
-				addMatch.ShiftedCount := ShiftedCount;
+				addMatch.Entropy := AGraph.CalculateEntropy(j-i, turns, shiftedCount);
+				addMatch.Turns := turns;
+				addMatch.ShiftedCount := shiftedCount;
 				matches.Add(addMatch);
 			end;
 
@@ -3072,7 +3098,7 @@ begin
 	Result.Add(TZxcvbnSpatialGraph.Create('mac_keypad', mac_keypad, False, 1));
 end;
 
-procedure TZxcvbnSpatialMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnSpatialMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	spatialGraph: TZxcvbnSpatialGraph;
 begin
@@ -3106,7 +3132,7 @@ begin
 	Result := LogN(2, PasswordCardinality(AMatch.BaseToken) * AMatch.RepeatCount);
 end;
 
-procedure TZxcvbnRepeatMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnRepeatMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	addMatch: TZxcvbnRepeatMatch;
 	matches: TList<TZxcvbnMatch>;
@@ -3152,12 +3178,12 @@ begin
 				BaseToken := match.Groups[1].Value;
 			end;
 
-			i := match.Groups[0].Index - 1;
-			j := match.Groups[0].Index - 1 + match.Groups[0].Length - 1;
+			i := match.Groups[0].Index-1;
+			j := match.Groups[0].Index-1 + match.Groups[0].Length-1;
 
 			addMatch := TZxcvbnRepeatMatch.Create;
 			addMatch.Pattern := RepeatPattern;
-			addMatch.Token := APassword.Substring(i, j - i + 1);
+			addMatch.Token := APassword.Substring(i, j-i+1);
 			addMatch.i := i;
 			addMatch.j := j;
 			addMatch.RepeatCount := match.Groups[0].Length div BaseToken.Length;
@@ -3165,7 +3191,7 @@ begin
 			addMatch.Entropy := CalculateEntropy(addMatch);
 			matches.Add(addMatch);
 
-			lastIndex := j + 1;
+			lastIndex := j+1;
 		end;
 
 		AMatches.AddRange(matches);
@@ -3189,7 +3215,7 @@ begin
 	FPerCharCardinality := APerCharCardinality;
 end;
 
-procedure TZxcvbnRegexMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnRegexMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	reMatches: System.RegularExpressions.TMatchCollection;
 	rem: System.RegularExpressions.TMatch;
@@ -3263,7 +3289,7 @@ begin
 	Result := BaseEntropy + LogN(2, AMatch.Length);
 end;
 
-procedure TZxcvbnSequenceMatcher.MatchPassword(APassword: string; var AMatches: TList<TZxcvbnMatch>);
+procedure TZxcvbnSequenceMatcher.MatchPassword(const APassword: string; var AMatches: TList<TZxcvbnMatch>);
 var
 	seqs: TStringList;
 	s: string;

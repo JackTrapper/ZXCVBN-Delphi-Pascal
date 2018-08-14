@@ -125,7 +125,7 @@ begin
 			begin
 				dictionaryName := '';
 				if match is TZxcvbnDictionaryMatch then
-					dictionaryName := ', '+TZxcvbnDictionaryMatch(match).DictionaryName;
+					dictionaryName := ' - '+TZxcvbnDictionaryMatch(match).DictionaryName;
 
 				s := s+#13#10+
 						'- "'+match.Token+'" ('+match.Pattern+dictionaryName+') - '+Format('%.5f bits', [match.Entropy]);
