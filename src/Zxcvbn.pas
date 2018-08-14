@@ -218,8 +218,6 @@ type
 
 		function GetLongestMatch(const AMatchSequence: TList<TZxcvbnMatch>): TZxcvbnMatch;
 		procedure GetMatchFeedback(const AMatch: TZxcvbnMatch; AIsSoleMatch: Boolean; LocaleName: string; out WarningText: string; out SuggestionsText: string);
-
-		function GetScoreText(AScore: Integer): string;
 	public
 		/// <summary>
 		/// Create a new instance of Zxcvbn with the default matchers.
@@ -853,6 +851,21 @@ begin
 	Result := suggestions;
 end;
 
+function GetScoreText(AScore: Integer; LocaleName: string): string;
+begin
+	Result := '';
+
+	case AScore of
+	0: Result := 'Too guessable; risky password.';
+	1: Result := 'Very guessable; protection from throttled online attacks.';
+	2: Result := 'Somewhat guessable; protection from unthrottled online attacks.';
+	3: Result := 'Safely unguessable; moderate protection from offline slow-hash scenario.';
+	4: Result := 'Very unguessable; strong protection from offline slow-hash scenario.';
+	end;
+
+	Result := L(Result, LocaleName);
+end;
+
 const
 	StartUpper = '^[A-Z][^A-Z]+$';
 	EndUpper   = '^[^A-Z]+[A-Z]$';
@@ -1395,6 +1408,12 @@ var
 	longestMatch: TZxcvbnMatch;
 	WarningText: string;
 	Suggestions: string;
+
+const
+	CrackSpeed_OnlineThrottled    = 100*60*60; //100 guesses/hour
+	CrackSpeed_OnlineNoThrottling = 100;       // 100 guesses/sec
+	CrackSpeed_OfflineSlowHash    = 10000;     // 10k guesses/sec
+	CrackSpeed_OfflineFastHash    = 10E9;      // 10B guesses/sec
 begin
 	bruteforce_cardinality := PasswordCardinality(APassword);
 
@@ -1512,17 +1531,18 @@ begin
 	res.Password := APassword;
 	res.Entropy := minEntropy;
 	res.MatchSequence := MatchSequence;
-	res.CrackTimeOnlineThrottling := res.Guesses / 100 * 60 * 60; // 100 guesses/hour
-	res.CrackTimeOnlineNoThrottling := res.Guesses / 100; // 100 guesses/sec
-	res.CrackTimeOfflineSlowHash := res.Guesses / 10000; // 10k guesses/sec
-	res.CrackTimeOfflineFastHash := res.Guesses / 10E9; // 10B guesses/sec
 
-	res.CrackTimeOnlineThrottlingDisplay := DisplayTime(res.CrackTimeOnlineThrottling, LocaleName);
+	res.CrackTimeOnlineThrottling   := res.Guesses / CrackSpeed_OnlineThrottled;
+	res.CrackTimeOnlineNoThrottling := res.Guesses / CrackSpeed_OnlineNoThrottling;
+	res.CrackTimeOfflineSlowHash    := res.Guesses / CrackSpeed_OfflineSlowHash;
+	res.CrackTimeOfflineFastHash    := res.Guesses / CrackSpeed_OfflineFastHash;
+
+	res.CrackTimeOnlineThrottlingDisplay   := DisplayTime(res.CrackTimeOnlineThrottling,   LocaleName);
 	res.CrackTimeOnlineNoThrottlingDisplay := DisplayTime(res.CrackTimeOnlineNoThrottling, LocaleName);
-	res.CrackTimeOfflineSlowHashDisplay := DisplayTime(res.CrackTimeOfflineSlowHash, LocaleName);
-	res.CrackTimeOfflineFastHashDisplay := DisplayTime(res.CrackTimeOfflineFastHash, LocaleName);
+	res.CrackTimeOfflineSlowHashDisplay    := DisplayTime(res.CrackTimeOfflineSlowHash,    LocaleName);
+	res.CrackTimeOfflineFastHashDisplay    := DisplayTime(res.CrackTimeOfflineFastHash,    LocaleName);
 
-	res.ScoreText := GetScoreText(res.Score); // match knows how to calculate score itself; it's from the entropy.
+	res.ScoreText := GetScoreText(res.Score, Self.LocaleName); // match knows how to calculate score itself (it comes from the entropy)
 
 	// starting feedback
 	if Assigned(MatchSequence) then
@@ -1585,21 +1605,6 @@ begin
 		AMatch.GetMatchFeedback(AIsSoleMatch, LocaleName, {out}WarningText, {out}SuggestionsText)
 	else if (AMatch.Pattern = 'date') then
 		AMatch.GetMatchFeedback(AIsSoleMatch, LocaleName, {out}WarningText, {out}SuggestionsText);
-end;
-
-function TZxcvbn.GetScoreText(AScore: Integer): string;
-begin
-	Result := '';
-
-	case AScore of
-	0: Result := 'Too guessable; risky password.';
-	1: Result := 'Very guessable; protection from throttled online attacks.';
-	2: Result := 'Somewhat guessable; protection from unthrottled online attacks.';
-	3: Result := 'Safely unguessable; moderate protection from offline slow-hash scenario.';
-	4: Result := 'Very unguessable; strong protection from offline slow-hash scenario.';
-	end;
-
-	Result := L(Result, Self.LocaleName);
 end;
 
 function TZxcvbn.EvaluatePassword(APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
