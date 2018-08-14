@@ -86,6 +86,8 @@ interface
 			- added "b6" and "q9" 1337-speak (HashCat)
 			- calculation time (ms) is now a float. QueryPerformanceCounter supports down to 0.0001 ms (100 ns) (i.e. "%.4f")
 			- Demo now includes some of the more well-known passwords (You may only see *******)
+			- Localization now does correct language fallback
+			- Localized ScoreText
 			- Merged everything into one unit (Zxcvbn.pas)
 			- Moved some purely internal classes and interfaces into the implementation section (don't expose your internal details)
 	Version 1.1   8/11/2018
@@ -459,12 +461,12 @@ const
 
 	de: array [0..36, 0..1] of string = (
 			// Crack times
-			('instant', 'unmittelbar'),
-			('minutes', 'Minuten'),
-			('hours', 'Stunden'),
-			('days', 'Tage'),
-			('months', 'Monate'),
-			('years', 'Jahre'),
+			('instant',   'unmittelbar'),
+			('minutes',   'Minuten'),
+			('hours',     'Stunden'),
+			('days',      'Tage'),
+			('months',    'Monate'),
+			('years',     'Jahre'),
 			('centuries', 'Jahrhunderte'),
 
 			// Warnings
@@ -507,12 +509,12 @@ const
 
 	fr: array [0..36, 0..1] of string = (
 			// Crack times
-			('instant', 'instantané'),
-			('minutes', 'Minutes'),
-			('hours', 'Heures'),
-			('days', 'Journées'),
-			('months', 'mois'),
-			('years', 'Ans'),
+			('instant',   'instantané'),
+			('minutes',   'Minutes'),
+			('hours',     'Heures'),
+			('days',      'Journées'),
+			('months',    'mois'),
+			('years',     'Ans'),
 			('centuries', 'Siècles'),
 
 			// Warnings
