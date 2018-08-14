@@ -11,19 +11,21 @@ type
   TMainForm = class(TForm)
     labStrength: TLabel;
     labWarnings: TLabel;
-    pbStrength: TPaintBox;
-    edPassword: TComboBox;
-    Label1: TLabel;
-    procedure FormCreate(Sender: TObject);
-    procedure FormDestroy(Sender: TObject);
-    procedure pbStrengthPaint(Sender: TObject);
+	 pbStrength: TPaintBox;
+	 edPassword: TComboBox;
+	 Label1: TLabel;
+	 Label2: TLabel;
+	 cbLocaleName: TComboBox;
+	 procedure FormCreate(Sender: TObject);
+	 procedure FormDestroy(Sender: TObject);
+	 procedure pbStrengthPaint(Sender: TObject);
   private
-    { Private declarations }
-    FZxcvbn: TZxcvbn;
-    FPasswordScore: Integer;
+	 { Private declarations }
+	 FZxcvbn: TZxcvbn;
+	 FPasswordScore: Integer;
   public
-    { Public declarations }
-    procedure DoOnPasswordEditChange(ASender: TObject);
+	 { Public declarations }
+	 procedure DoOnPasswordEditChange(ASender: TObject);
   end;
 
 var
@@ -34,16 +36,22 @@ implementation
 {$R *.dfm}
 {$R Dictionaries.res}
 
+const
+	LOCALE_SNAME = $0000005c;  { locale name (ie: en-us) }
+
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  FZxcvbn := TZxcvbn.Create;
-	Fzxcvbn.LocaleName := 'fr-FR';
-  FPasswordScore := 0;
-  pbStrength.Canvas.Brush.Color := clWhite;
-  pbStrength.Canvas.Pen.Color := clBlack;
-  pbStrength.Canvas.Pen.Width := 1;
+	FZxcvbn := TZxcvbn.Create;
 
-  edPassword.OnChange := TDebouncedEvent.Wrap(DoOnPasswordEditChange, 200, Self);
+	FPasswordScore := 0;
+	pbStrength.Canvas.Brush.Color := clWhite;
+	pbStrength.Canvas.Pen.Color := clBlack;
+	pbStrength.Canvas.Pen.Width := 1;
+
+	cbLocaleName.Text := GetLocaleStr(LOCALE_USER_DEFAULT, LOCALE_SNAME, '');
+
+	edPassword.OnChange := TDebouncedEvent.Wrap(DoOnPasswordEditChange, 200, Self);
+	cbLocaleName.OnChange := TDebouncedEvent.Wrap(DoOnPasswordEditChange, 200, Self);
 
 	DoOnPasswordEditChange(Sender);
 end;
@@ -75,6 +83,8 @@ var
 	match: TZxcvbnMatch;
 	dictionaryName: string;
 begin
+	FZxcvbn.LocaleName := cbLocaleName.Text;
+
   res := FZxcvbn.EvaluatePassword(edPassword.Text);
   try
 		FPasswordScore := res.Score;

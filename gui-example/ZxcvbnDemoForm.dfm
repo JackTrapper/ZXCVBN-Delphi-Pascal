@@ -54,9 +54,16 @@ object MainForm: TMainForm
   object Label1: TLabel
     Left = 16
     Top = 8
-    Width = 50
+    Width = 46
     Height = 13
-    Caption = 'Password:'
+    Caption = 'Password'
+  end
+  object Label2: TLabel
+    Left = 296
+    Top = 8
+    Width = 60
+    Height = 13
+    Caption = 'Locale Name'
   end
   object edPassword: TComboBox
     Left = 16
@@ -72,5 +79,17 @@ object MainForm: TMainForm
       'Tr0ub4dor&3'
       'Tr0ub4dour&3'
       'hunter2')
+  end
+  object cbLocaleName: TComboBox
+    Left = 296
+    Top = 24
+    Width = 73
+    Height = 21
+    TabOrder = 1
+    Text = 'en-US'
+    Items.Strings = (
+      'en-US'
+      'fr-FR'
+      'de-DE')
   end
 end

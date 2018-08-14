@@ -115,7 +115,6 @@ type
 		function GetGuesses: Real;
 		function GetGuessesLog10: Real;
 		function GetScore: Integer;
-		function GetScoreText: string;
 	public
 		/// <summary>A calculated estimate of how many bits of entropy the password covers, rounded to three decimal places.</summary>
 		Entropy: Double;
@@ -147,6 +146,8 @@ type
 		/// <summary>Suggestion on how to improve the password</summary>
 		SuggestionsText: string;
 
+		ScoreText: string; //Localized description of the score
+
 		/// <summary>Constructor initialize Suggestion list.</summary>
 		constructor Create;
 		destructor Destroy; override;
@@ -154,7 +155,6 @@ type
 		property Guesses: Real read GetGuesses; // estimated number of guesses to crack password
 		property GuessesLog10: Real read GetGuessesLog10; // order of magnitude of result.guesses
 		property Score: Integer read GetScore; // A score from 0 to 4 (inclusive). 0: too guessable, 1: very guessable, 2:somewhat guessable, 3: safely unguessable, 4:very unguessable
-		property ScoreText: string read GetScoreText;
 	end;
 
 	/// <summary>All pattern matchers must implement the IZxcvbnMatcher interface.</summary>
@@ -216,6 +216,8 @@ type
 
 		function GetLongestMatch(const AMatchSequence: TList<TZxcvbnMatch>): TZxcvbnMatch;
 		procedure GetMatchFeedback(const AMatch: TZxcvbnMatch; AIsSoleMatch: Boolean; LocaleName: string; out WarningText: string; out SuggestionsText: string);
+
+		function GetScoreText(AScore: Integer): string;
 	public
 		/// <summary>
 		/// Create a new instance of Zxcvbn with the default matchers.
@@ -428,93 +430,155 @@ uses
 	Winapi.Windows,
 	ZLibEx;
 
+function GetLocaleStrEx(LocaleName: string; LocaleType: Integer; Default: string): string;
+var
+	cch: Integer;
+	buffer: array[0..255] of Char;
+begin
+	cch := GetLocaleInfoEx(PWideChar(LocaleName), LocaleType, Buffer, Length(Buffer));
+
+	if cch > 0 then
+		SetString(Result, Buffer, cch-1)
+	else
+		Result := Default;
+end;
+
 /// <summary>Localize a string into the given locale.
 /// If no translation is availble, the original text is returned.
 /// </summary>
 /// <param name="AMatcher">The text to be localized</param>
 /// <param name="LocaleName">The language (e.g. 'fr-CA') to convert text into.</param>
-function L(AMatcher: string; LocaleName: string = ''): string;
+function L(AMatcher: string; LocaleName: string): string;
 var
 	i: Integer;
+	parentLanguage: string;
 
 const
-	deDE: array [0 .. 31, 0 .. 1] of string = (
+	LOCALE_SNAME   = $0000005c;  { locale name (ie: en-us) }
+	LOCALE_SPARENT = $0000006d;  { Fallback name for resources }
+
+	de: array [0 .. 31, 0 .. 1] of string = (
 			// Crack times
-			('instant', 'unmittelbar'), ('minutes', 'Minuten'), ('hours', 'Stunden'), ('days', 'Tage'), ('months', 'Monate'), ('years', 'Jahre'), ('centuries', 'Jahrhunderte'),
+			('instant', 'unmittelbar'),
+			('minutes', 'Minuten'),
+			('hours', 'Stunden'),
+			('days', 'Tage'),
+			('months', 'Monate'),
+			('years', 'Jahre'),
+			('centuries', 'Jahrhunderte'),
 
 			// Warnings
-			('Straight rows of keys are easy to guess', 'Gerade Reihen von Tasten sind leicht zu erraten'), ('Short keyboard patterns are easy to guess', 'Kurze Tastaturmuster sind leicht zu erraten'),
-			('Repeats like "aaa" are easy to guess', 'Wiederholungen wie "aaa" sind leicht zu erraten'), ('Repeats like "abcabcabc" are only slightly harder to guess than "abc"',
-			'Wiederholungen wie "abcabcabc" sind nur etwas schwerer zu erraten als "abc"'), ('Sequences like abc or 6543 are easy to guess', 'Sequenzen wie abc oder 6543 sind leicht zu erraten'),
-			('Recent years are easy to guess', 'Die letzten Jahre sind leicht zu erraten'), ('Dates are often easy to guess', 'Termine sind oft leicht zu erraten'),
-			('This is a top-10 common password', 'Dies ist ein Top-10-Passwort'), ('This is a top-100 common password', 'Dies ist ein Top-100-Passwort'),
-			('This is a very common password', 'Dies ist ein sehr häufiges Passwort'), ('This is similar to a commonly used password', 'Dies ähnelt einem häufig verwendeten Passwort'),
-			('A word by itself is easy to guess', 'Ein Wort an sich ist leicht zu erraten'), ('Names and surnames by themselves are easy to guess', 'Namen und Familiennamen sind leicht zu erraten'),
+			('Straight rows of keys are easy to guess', 'Gerade Reihen von Tasten sind leicht zu erraten'),
+			('Short keyboard patterns are easy to guess', 'Kurze Tastaturmuster sind leicht zu erraten'),
+			('Repeats like "aaa" are easy to guess', 'Wiederholungen wie "aaa" sind leicht zu erraten'),
+			('Repeats like "abcabcabc" are only slightly harder to guess than "abc"', 'Wiederholungen wie "abcabcabc" sind nur etwas schwerer zu erraten als "abc"'),
+			('Sequences like abc or 6543 are easy to guess', 'Sequenzen wie abc oder 6543 sind leicht zu erraten'),
+			('Recent years are easy to guess', 'Die letzten Jahre sind leicht zu erraten'),
+			('Dates are often easy to guess', 'Termine sind oft leicht zu erraten'),
+			('This is a top-10 common password', 'Dies ist ein Top-10-Passwort'),
+			('This is a top-100 common password', 'Dies ist ein Top-100-Passwort'),
+			('This is a very common password', 'Dies ist ein sehr häufiges Passwort'),
+			('This is similar to a commonly used password', 'Dies ähnelt einem häufig verwendeten Passwort'),
+			('A word by itself is easy to guess', 'Ein Wort an sich ist leicht zu erraten'),
+			('Names and surnames by themselves are easy to guess', 'Namen und Familiennamen sind leicht zu erraten'),
 			('Common names and surnames are easy to guess', 'Allgemeine Namen und Nachnamen sind leicht zu erraten'),
 
 			// Suggestions
 			('Add another word or two. Uncommon words are better.', 'Fügen Sie ein oder zwei weitere Wörter hinzu. Ungewöhnliche Wörter sind besser.'),
 			('Use a longer keyboard pattern with more turns', 'Verwenden Sie ein längeres Tastaturmuster mit mehr Drehungen'),
-			('Avoid repeated words and characters', 'Vermeiden Sie wiederholte Wörter und Zeichen'), ('Avoid sequences', 'Vermeiden Sie Sequenzen'),
+			('Avoid repeated words and characters', 'Vermeiden Sie wiederholte Wörter und Zeichen'),
+			('Avoid sequences', 'Vermeiden Sie Sequenzen'),
 			('Avoid recent years ' + #10 + ' Avoid years that are associated with you', 'Vermeide die letzten Jahre' + #10 + 'Vermeiden Sie Jahre, die mit Ihnen verbunden sind'),
 			('Avoid dates and years that are associated with you', 'Vermeiden Sie Daten und Jahre, die mit Ihnen verbunden sind'),
-			('Capitalization doesn''t help very much', 'Die Großschreibung hilft nicht sehr'), ('All-uppercase is almost as easy to guess as all-lowercase',
-			'Großbuchstaben sind fast so einfach zu erraten wie Kleinbuchstaben'), ('Reversed words aren''t much harder to guess', 'Umgekehrte Wörter sind nicht viel schwerer zu erraten'),
+			('Capitalization doesn''t help very much', 'Die Großschreibung hilft nicht sehr'),
+			('All-uppercase is almost as easy to guess as all-lowercase', 'Großbuchstaben sind fast so einfach zu erraten wie Kleinbuchstaben'),
+			('Reversed words aren''t much harder to guess', 'Umgekehrte Wörter sind nicht viel schwerer zu erraten'),
 			('Predictable substitutions like "@" instead of "a" don''t help very much', 'Vorhersehbare Substitutionen wie "@" anstelle von "a" helfen nicht sehr'),
-			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Verwenden Sie ein paar Wörter, vermeiden Sie häufige Phrasen' + #10 +
-			'Keine Notwendigkeit für Symbole, Ziffern oder Großbuchstaben'));
+			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Verwenden Sie ein paar Wörter, vermeiden Sie häufige Phrasen' + #10 + 'Keine Notwendigkeit für Symbole, Ziffern oder Großbuchstaben'));
 
-	frFR: array [0 .. 31, 0 .. 1] of string = (
+	fr: array [0 .. 31, 0 .. 1] of string = (
 			// Crack times
-			('instant', 'instantané'), ('minutes', 'Minutes'), ('hours', 'Heures'), ('days', 'Journées'), ('months', 'mois'), ('years', 'Ans'), ('centuries', 'Siècles'),
+			('instant', 'instantané'),
+			('minutes', 'Minutes'),
+			('hours', 'Heures'),
+			('days', 'Journées'),
+			('months', 'mois'),
+			('years', 'Ans'),
+			('centuries', 'Siècles'),
 
 			// Warnings
 			('Straight rows of keys are easy to guess', 'Des rangées droites de touches sont faciles à deviner'),
-			('Short keyboard patterns are easy to guess', 'Les raccourcis clavier sont faciles à deviner'), ('Repeats like "aaa" are easy to guess', 'Des répétitions comme "aaa" sont faciles à deviner'),
+			('Short keyboard patterns are easy to guess', 'Les raccourcis clavier sont faciles à deviner'),
+			('Repeats like "aaa" are easy to guess', 'Des répétitions comme "aaa" sont faciles à deviner'),
 			('Repeats like "abcabcabc" are only slightly harder to guess than "abc"', 'Les répétitions comme "abcabcabc" ne sont que légèrement plus difficiles à deviner que "abc"'),
-			('Sequences like abc or 6543 are easy to guess', 'Des séquences comme abc ou 6543 sont faciles à deviner'), ('Recent years are easy to guess', 'Les dernières années sont faciles à deviner'),
-			('Dates are often easy to guess', 'Les dates sont souvent faciles à deviner'), ('This is a top-10 common password', 'Ceci est un mot de passe commun top-10'),
-			('This is a top-100 common password', 'Ceci est un mot de passe commun parmi les 100 premiers'), ('This is a very common password', 'Ceci est un mot de passe très courant'),
-			('This is similar to a commonly used password', 'Ceci est similaire à un mot de passe couramment utilisé'), ('A word by itself is easy to guess', 'Un mot en soi est facile à deviner'),
+			('Sequences like abc or 6543 are easy to guess', 'Des séquences comme abc ou 6543 sont faciles à deviner'),
+			('Recent years are easy to guess', 'Les dernières années sont faciles à deviner'),
+			('Dates are often easy to guess', 'Les dates sont souvent faciles à deviner'),
+			('This is a top-10 common password', 'Ceci est un mot de passe commun top-10'),
+			('This is a top-100 common password', 'Ceci est un mot de passe commun parmi les 100 premiers'),
+			('This is a very common password', 'Ceci est un mot de passe très courant'),
+			('This is similar to a commonly used password', 'Ceci est similaire à un mot de passe couramment utilisé'),
+			('A word by itself is easy to guess', 'Un mot en soi est facile à deviner'),
 			('Names and surnames by themselves are easy to guess', 'Les noms et prénoms sont faciles à deviner'),
 			('Common names and surnames are easy to guess', 'Les noms et prénoms communs sont faciles à deviner'),
 
 			('Add another word or two. Uncommon words are better.', 'Ajouter un autre mot ou deux. Les mots peu communs sont meilleurs.'),
 			('Use a longer keyboard pattern with more turns', 'Utilisez un modèle de clavier plus long avec plus de tours'),
-			('Avoid repeated words and characters', 'Évitez les mots et les caractères répétés'), ('Avoid sequences', 'asdfaÉviter les séquencessdf'),
+			('Avoid repeated words and characters', 'Évitez les mots et les caractères répétés'),
+			('Avoid sequences', 'asdfaÉviter les séquencessdf'),
 			('Avoid recent years ' + #10 + ' Avoid years that are associated with you', 'Éviter les dernières années' + #13#10 + 'Évitez les années qui vous sont associées'),
 			('Avoid dates and years that are associated with you', 'Évitez les dates et les années qui vous sont associées'),
-			('Capitalization doesn''t help very much', 'La capitalisation n''aide pas beaucoup'), ('All-uppercase is almost as easy to guess as all-lowercase',
-			'Les majuscules sont presque aussi faciles à deviner que les minuscules'), ('Reversed words aren''t much harder to guess', 'Les mots inversés ne sont pas beaucoup plus difficiles à deviner'),
+			('Capitalization doesn''t help very much', 'La capitalisation n''aide pas beaucoup'),
+			('All-uppercase is almost as easy to guess as all-lowercase', 'Les majuscules sont presque aussi faciles à deviner que les minuscules'),
+			('Reversed words aren''t much harder to guess', 'Les mots inversés ne sont pas beaucoup plus difficiles à deviner'),
 			('Predictable substitutions like "@" instead of "a" don''t help very much', 'Les substitutions prévisibles comme "@" au lieu de "a" n''aident pas beaucoup'),
-			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Utilisez quelques mots, évitez les phrases courantes' + #13#10 +
-			'Pas besoin de symboles, de chiffres ou de lettres majuscules'));
+			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Utilisez quelques mots, évitez les phrases courantes' + #13#10 + 'Pas besoin de symboles, de chiffres ou de lettres majuscules'));
 begin
 	Result := AMatcher;
 
 	if AMatcher = '' then
 		Exit;
 
-	if LocaleName.StartsWith('de', True) then
+	if LocaleName = '' then
+		LocaleName := GetLocaleStr(LOCALE_USER_DEFAULT, LOCALE_SNAME, 'en-US');
+
+	{
+		Languages have many variants:
+
+		 - German:  de-AT, de-CH, de-DE, de-LI, de-LU
+		 - French:  fr-029, fr-BE, fr-CA, fr-CD, fr-CH, fr-CI, fr-CM, fr-FR, fr-HT, fr-LU, fr-MA, fr-MC, fr-ML, fr-RE, fr-SN
+		 - English: en-029, en-AU, en-BZ, en-CA, en-GB, en-HK, en-ID, en-IE, en-IN, en-JM, en-MY, en-NZ, en-PH, en-SG, en-TT, en-US, en-ZA, en-ZW
+
+		Nobody will ever add any other languages to Zxcvbn.
+		And they certainly won't add different sub-variants of German, French, or English.
+		So we're safe simply falling back parent language of the locale.
+
+			en-US --> en (English)
+			de-DE --> de (Deutsch)
+			fr-FR --> fr (Français)
+	}
+	parentLanguage := GetLocaleStrEx(LocaleName, LOCALE_SPARENT, 'en');
+
+	if SameText(parentLanguage, 'de') then
 	begin
-		for i := Low(deDE) to High(deDE) do
+		for i := Low(de) to High(de) do
 		begin
-			if SameText(deDE[i, 0], AMatcher) then
+			if SameText(de[i, 0], AMatcher) then
 			begin
-				Result := deDE[i, 1];
+				Result := de[i, 1];
 				Exit;
 			end;
 		end;
 		if IsDebuggerPresent then
 			OutputDebugString(PChar('No deDE translaction for "' + AMatcher + '"'));
 	end
-	else if LocaleName.StartsWith('fr', True) then
+	else if SameText(parentLanguage, 'fr') then
 	begin
-		for i := Low(frFR) to High(frFR) do
+		for i := Low(fr) to High(fr) do
 		begin
-			if SameText(frFR[i, 0], AMatcher) then
+			if SameText(fr[i, 0], AMatcher) then
 			begin
-				Result := frFR[i, 1];
+				Result := fr[i, 1];
 				Exit;
 			end;
 		end;
@@ -523,7 +587,7 @@ begin
 	end;
 end;
 
-function DisplayTime(ASeconds: Real; LocaleName: string = ''): string;
+function DisplayTime(ASeconds: Real; LocaleName: string): string;
 const
 	minute  = 60;
 	hour    = minute * 60;
@@ -835,9 +899,9 @@ end;
 /// </summary>
 /// <param name="crackTimeSeconds">Number of seconds estimated for password cracking</param>
 /// <returns> Password strength. 0 to 4, 0 is minimum </returns>
-function EntropyToScore(Entropy: Double): Integer;
+function EntropyToScore(Entropy: Real): Integer;
 var
-	Guesses: Real;
+	guesses: Real;
 begin
 	{
 	  Integer from 0-4 (useful for implementing a strength bar)
@@ -849,15 +913,15 @@ begin
 	  4 # very unguessable: strong protection from offline slow-hash scenario. (guesses >= 10^10)
 	}
 
-	Guesses := 0.5 * Power(2, Entropy);
+	guesses := 0.5 * Power(2, Entropy);
 
-	if (Guesses < 10E3) then
+	if (guesses < 10E3) then
 		Result := 0
-	else if (Guesses < 10E6) then
+	else if (guesses < 10E6) then
 		Result := 1
-	else if (Guesses < 10E8) then
+	else if (guesses < 10E8) then
 		Result := 2
-	else if (Guesses < 10E10) then
+	else if (guesses < 10E10) then
 		Result := 3
 	else
 		Result := 4;
@@ -1433,10 +1497,12 @@ begin
 	res.CrackTimeOfflineSlowHash := res.Guesses / 10000; // 10k guesses/sec
 	res.CrackTimeOfflineFastHash := res.Guesses / 10E9; // 10B guesses/sec
 
-	res.CrackTimeOnlineThrottlingDisplay := DisplayTime(res.CrackTimeOnlineThrottling);
-	res.CrackTimeOnlineNoThrottlingDisplay := DisplayTime(res.CrackTimeOnlineNoThrottling);
-	res.CrackTimeOfflineSlowHashDisplay := DisplayTime(res.CrackTimeOfflineSlowHash);
-	res.CrackTimeOfflineFastHashDisplay := DisplayTime(res.CrackTimeOfflineFastHash);
+	res.CrackTimeOnlineThrottlingDisplay := DisplayTime(res.CrackTimeOnlineThrottling, LocaleName);
+	res.CrackTimeOnlineNoThrottlingDisplay := DisplayTime(res.CrackTimeOnlineNoThrottling, LocaleName);
+	res.CrackTimeOfflineSlowHashDisplay := DisplayTime(res.CrackTimeOfflineSlowHash, LocaleName);
+	res.CrackTimeOfflineFastHashDisplay := DisplayTime(res.CrackTimeOfflineFastHash, LocaleName);
+
+	res.ScoreText := GetScoreText(res.Score); // match knows how to calculate score itself; it's from the entropy.
 
 	// starting feedback
 	if Assigned(MatchSequence) then
@@ -1499,6 +1565,21 @@ begin
 		AMatch.GetMatchFeedback(AIsSoleMatch, LocaleName, {out}WarningText, {out}SuggestionsText)
 	else if (AMatch.Pattern = 'date') then
 		AMatch.GetMatchFeedback(AIsSoleMatch, LocaleName, {out}WarningText, {out}SuggestionsText);
+end;
+
+function TZxcvbn.GetScoreText(AScore: Integer): string;
+begin
+	Result := '';
+
+	case AScore of
+	0: Result := 'Too guessable; risky password.';
+	1: Result := 'Very guessable; protection from throttled online attacks.';
+	2: Result := 'Somewhat guessable; protection from unthrottled online attacks.';
+	3: Result := 'Safely unguessable; moderate protection from offline slow-hash scenario.';
+	4: Result := 'Very unguessable; strong protection from offline slow-hash scenario.';
+	end;
+
+	Result := L(Result, Self.LocaleName);
 end;
 
 function TZxcvbn.EvaluatePassword(APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
@@ -1646,26 +1727,6 @@ begin
 	  - 4: very unguessable - strong protection from offline slow-hash scenario. (guesses >= 10^10)
 	}
 	Result := EntropyToScore(Self.Entropy);
-end;
-
-function TZxcvbnResult.GetScoreText: string;
-begin
-	case Self.Score of
-	0:
-		Result := 'Too guessable; risky password.';
-	1:
-		Result := 'Very guessable; protection from throttled online attacks.';
-	2:
-		Result := 'Somewhat guessable; protection from unthrottled online attacks.';
-	3:
-		Result := 'Safely unguessable; moderate protection from offline slow-hash scenario.';
-	4:
-		Result := 'Very unguessable; strong protection from offline slow-hash scenario.';
-else
-	Result := '';
-	end;
-
-	Result := L(Result);
 end;
 
 { TZxcvbnMatch }
