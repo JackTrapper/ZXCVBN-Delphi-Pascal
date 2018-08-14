@@ -457,7 +457,7 @@ const
 	LOCALE_SNAME   = $0000005c;  { locale name (ie: en-us) }
 	LOCALE_SPARENT = $0000006d;  { Fallback name for resources }
 
-	de: array [0 .. 31, 0 .. 1] of string = (
+	de: array [0..36, 0..1] of string = (
 			// Crack times
 			('instant', 'unmittelbar'),
 			('minutes', 'Minuten'),
@@ -494,9 +494,18 @@ const
 			('All-uppercase is almost as easy to guess as all-lowercase', 'Großbuchstaben sind fast so einfach zu erraten wie Kleinbuchstaben'),
 			('Reversed words aren''t much harder to guess', 'Umgekehrte Wörter sind nicht viel schwerer zu erraten'),
 			('Predictable substitutions like "@" instead of "a" don''t help very much', 'Vorhersehbare Substitutionen wie "@" anstelle von "a" helfen nicht sehr'),
-			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Verwenden Sie ein paar Wörter, vermeiden Sie häufige Phrasen' + #10 + 'Keine Notwendigkeit für Symbole, Ziffern oder Großbuchstaben'));
+			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Verwenden Sie ein paar Wörter, vermeiden Sie häufige Phrasen' + #10 + 'Keine Notwendigkeit für Symbole, Ziffern oder Großbuchstaben'),
 
-	fr: array [0 .. 31, 0 .. 1] of string = (
+			//Score
+			('Too guessable; risky password.', 'Zu erraten; riskantes Passwort.'),
+			('Very guessable; protection from throttled online attacks.', 'Sehr erraten; Schutz vor gedrosselten Online-Angriffen.'),
+			('Somewhat guessable; protection from unthrottled online attacks.', 'Etwas zu erraten; Schutz vor ungedrosselten Online-Angriffen.'),
+			('Safely unguessable; moderate protection from offline slow-hash scenario.', 'Sicher unbegreifbar; Moderater Schutz vor Offline-Slow-Hash-Szenario.'),
+			('Very unguessable; strong protection from offline slow-hash scenario.', 'Sehr unbegreiflich; starker Schutz vor Offline-Slow-Hash-Szenario.')
+	);
+
+
+	fr: array [0..36, 0..1] of string = (
 			// Crack times
 			('instant', 'instantané'),
 			('minutes', 'Minutes'),
@@ -532,7 +541,16 @@ const
 			('All-uppercase is almost as easy to guess as all-lowercase', 'Les majuscules sont presque aussi faciles à deviner que les minuscules'),
 			('Reversed words aren''t much harder to guess', 'Les mots inversés ne sont pas beaucoup plus difficiles à deviner'),
 			('Predictable substitutions like "@" instead of "a" don''t help very much', 'Les substitutions prévisibles comme "@" au lieu de "a" n''aident pas beaucoup'),
-			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Utilisez quelques mots, évitez les phrases courantes' + #13#10 + 'Pas besoin de symboles, de chiffres ou de lettres majuscules'));
+			('Use a few words, avoid common phrases ' + #10 + ' No need for symbols, digits, or uppercase letters', 'Utilisez quelques mots, évitez les phrases courantes' + #13#10 + 'Pas besoin de symboles, de chiffres ou de lettres majuscules'),
+
+			//Score
+			('Too guessable; risky password.', 'Trop devinable; mot de passe risqué.'),
+			('Very guessable; protection from throttled online attacks.', 'Très devinable; protection contre les attaques en ligne étranglées.'),
+			('Somewhat guessable; protection from unthrottled online attacks.', 'Un peu devinable protection contre les attaques en ligne sans restriction.'),
+			('Safely unguessable; moderate protection from offline slow-hash scenario.', 'Sûrement impénétrable protection modérée contre le scénario de hachage lent hors ligne.'),
+			('Very unguessable; strong protection from offline slow-hash scenario.', 'Très impénétrable forte protection contre le scénario de hachage lent hors ligne.')
+	);
+
 begin
 	Result := AMatcher;
 
