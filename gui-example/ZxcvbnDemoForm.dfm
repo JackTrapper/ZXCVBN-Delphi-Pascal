@@ -3,8 +3,8 @@ object MainForm: TMainForm
   Top = 0
   BorderIcons = [biSystemMenu, biMinimize]
   Caption = 'zxcvbn-pascal Demo'
-  ClientHeight = 358
-  ClientWidth = 444
+  ClientHeight = 400
+  ClientWidth = 664
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -15,8 +15,8 @@ object MainForm: TMainForm
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   DesignSize = (
-    444
-    358)
+    664
+    400)
   PixelsPerInch = 96
   TextHeight = 13
   object labStrength: TLabel
@@ -29,8 +29,8 @@ object MainForm: TMainForm
   object labWarnings: TLabel
     Left = 16
     Top = 92
-    Width = 410
-    Height = 243
+    Width = 630
+    Height = 300
     Anchors = [akLeft, akTop, akRight, akBottom]
     AutoSize = False
     Font.Charset = DEFAULT_CHARSET
@@ -39,9 +39,10 @@ object MainForm: TMainForm
     Font.Name = 'Consolas'
     Font.Style = []
     ParentFont = False
+    ShowAccelChar = False
     WordWrap = True
-    ExplicitWidth = 345
-    ExplicitHeight = 245
+    ExplicitWidth = 410
+    ExplicitHeight = 258
   end
   object pbStrength: TPaintBox
     Left = 116
@@ -50,14 +51,26 @@ object MainForm: TMainForm
     Height = 8
     OnPaint = pbStrengthPaint
   end
-  object edPassword: TLabeledEdit
+  object Label1: TLabel
     Left = 16
-    Top = 32
-    Width = 345
+    Top = 8
+    Width = 50
+    Height = 13
+    Caption = 'Password:'
+  end
+  object edPassword: TComboBox
+    Left = 16
+    Top = 24
+    Width = 265
     Height = 21
-    EditLabel.Width = 50
-    EditLabel.Height = 13
-    EditLabel.Caption = 'Password:'
     TabOrder = 0
+    Text = 'correct horse battery staple'
+    Items.Strings = (
+      'correct horse battery staple'
+      'Compl3xity < Length!'
+      'cLbTyv2t'
+      'Tr0ub4dor&3'
+      'Tr0ub4dour&3'
+      'hunter2')
   end
 end
