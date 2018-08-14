@@ -87,7 +87,7 @@ interface
 			- calculation time (ms) is now a float. QueryPerformanceCounter supports down to 0.0001 ms (100 ns) (i.e. "%.4f")
 			- Demo now includes some of the more well-known passwords (You may only see *******)
 			- Merged everything into one unit (Zxcvbn.pas)
-			- Moved some purly internal classes and interfaces into the implementation section (don't expose your internal details)
+			- Moved some purely internal classes and interfaces into the implementation section (don't expose your internal details)
 	Version 1.1   8/11/2018
 			- Removed duplicated words from dictionaries
 			- Removed unused variable

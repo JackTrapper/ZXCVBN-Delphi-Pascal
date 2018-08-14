@@ -9,10 +9,11 @@ uses
 
 type
   TMainForm = class(TForm)
-    edPassword: TLabeledEdit;
     labStrength: TLabel;
     labWarnings: TLabel;
     pbStrength: TPaintBox;
+    edPassword: TComboBox;
+    Label1: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure pbStrengthPaint(Sender: TObject);
@@ -36,12 +37,15 @@ implementation
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   FZxcvbn := TZxcvbn.Create;
+	Fzxcvbn.LocaleName := 'fr-FR';
   FPasswordScore := 0;
   pbStrength.Canvas.Brush.Color := clWhite;
   pbStrength.Canvas.Pen.Color := clBlack;
   pbStrength.Canvas.Pen.Width := 1;
 
   edPassword.OnChange := TDebouncedEvent.Wrap(DoOnPasswordEditChange, 200, Self);
+
+	DoOnPasswordEditChange(Sender);
 end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
@@ -60,43 +64,68 @@ begin
     1: begin pbStrength.Canvas.Brush.Color := $00277FFF; pbStrength.Canvas.FillRect(Rect(1, 1, 2 * (pbStrength.Width div 5)-1, pbStrength.Height-1)); end;
     2: begin pbStrength.Canvas.Brush.Color := $000EC9FF; pbStrength.Canvas.FillRect(Rect(1, 1, 3 * (pbStrength.Width div 5)-1, pbStrength.Height-1)); end;
     3: begin pbStrength.Canvas.Brush.Color := $00E8A200; pbStrength.Canvas.FillRect(Rect(1, 1, 4 * (pbStrength.Width div 5)-1, pbStrength.Height-1)); end;
-    4: begin pbStrength.Canvas.Brush.Color := $004CB122; pbStrength.Canvas.FillRect(Rect(1, 1, pbStrength.Width-1, pbStrength.Height-1)); end;
+	 4: begin pbStrength.Canvas.Brush.Color := $004CB122; pbStrength.Canvas.FillRect(Rect(1, 1, pbStrength.Width-1, pbStrength.Height-1)); end;
   end;
 end;
 
 procedure TMainForm.DoOnPasswordEditChange(ASender: TObject);
 var
-  res: TZxcvbnResult;
-  s: string;
+	res: TZxcvbnResult;
+	s: string;
+	match: TZxcvbnMatch;
+	dictionaryName: string;
 begin
   res := FZxcvbn.EvaluatePassword(edPassword.Text);
   try
-	 FPasswordScore := res.Score;
-	 pbStrength.Invalidate;
+		FPasswordScore := res.Score;
+		pbStrength.Invalidate;
 
-	 s :=
-			'Guesses (Log10):     '+FloatToStrF(res.GuessesLog10, ffFixed, 15, 5)+#13#10+
-			'Score:               '+Format('%d / 4', [res.Score])+#13#10+
-			'Calculation runtime: '+IntToStr(res.CalcTime)+' ms'+#13#10+#13#10+
+		s :=
+				'Calculation runtime: '+Format('%.4f ms', [res.CalcTime])+#13#10+#13#10+
 
-			'Guess times: '+#13#10+
-			' • 100 / hour:   '+res.CrackTimeOnlineThrottlingDisplay+' (throttling online attack)'+#13#10+
-			' • 10  / second: '+res.CrackTimeOnlineNoThrottlingDisplay+' (unthrottled online attack)'+#13#10+
-			' • 10k / second: '+res.CrackTimeOfflineSlowHashDisplay+' (offline attack, slow hash, many cores)'+#13#10+
-			' • 100 / hour:   '+res.CrackTimeOfflineFastHashDisplay+' (offline attack, fast hash, many cores)';
+				'Score:               '+Format('%d / 4', [res.Score])+#13#10+
+				'                     '+res.ScoreText+#13#10+#13#10+
 
-	s := s+#13#10+#13#10+
-			'Warning: ' + #10 +
-			res.WarningText;
+				'Guesses (Log10):     '+FloatToStrF(res.GuessesLog10, ffFixed, 15, 5)+#13#10+#13#10+
 
-	s := s+#13#10+#13#10+
-			'Suggestions: ' + #10 +
-			res.SuggestionsText;
+				'Guess times: '+#13#10+
+				' • 100 / hour:       '+res.CrackTimeOnlineThrottlingDisplay+' (throttling online attack)'+#13#10+
+				' • 10  / second:     '+res.CrackTimeOnlineNoThrottlingDisplay+' (unthrottled online attack)'+#13#10+
+				' • 10k / second:     '+res.CrackTimeOfflineSlowHashDisplay+' (offline attack, slow hash, many cores)'+#13#10+
+				' • 10B / hour:       '+res.CrackTimeOfflineFastHashDisplay+' (offline attack, fast hash, many cores)';
 
-	labWarnings.Caption := s;
-  finally
-	 res.Free;
-  end;
+		if res.WarningText <> '' then
+		begin
+			s := s+#13#10+#13#10+
+					'Warning: ' + #10 +
+					res.WarningText;
+		end;
+
+		if res.SuggestionsText <> '' then
+		begin
+			s := s+#13#10+#13#10+
+					'Suggestions: ' + #10 +
+					res.SuggestionsText;
+		end;
+
+		if res.MatchSequence.Count > 0 then
+		begin
+			s := s+#13#10+#13#10;
+			for match in res.MatchSequence do
+			begin
+				dictionaryName := '';
+				if match is TZxcvbnDictionaryMatch then
+					dictionaryName := ', '+TZxcvbnDictionaryMatch(match).DictionaryName;
+
+				s := s+#13#10+
+						'- "'+match.Token+'" ('+match.Pattern+dictionaryName+') - '+Format('%.5f bits', [match.Entropy]);
+			end;
+		end;
+
+		labWarnings.Caption := s;
+	finally
+		res.Free;
+	end;
 end;
 
 end.
