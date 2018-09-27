@@ -34,7 +34,6 @@ var
 implementation
 
 {$R *.dfm}
-{$R Dictionaries.res}
 
 const
 	LOCALE_SNAME = $0000005c;  { locale name (ie: en-us) }
@@ -125,7 +124,7 @@ begin
 			begin
 				dictionaryName := '';
 				if match is TZxcvbnDictionaryMatch then
-					dictionaryName := ' - '+TZxcvbnDictionaryMatch(match).DictionaryName;
+					dictionaryName := ' - '+TZxcvbnDictionaryMatch(match).DictionaryName+' #'+IntToStr(TZxcvbnDictionaryMatch(match).Rank);
 
 				s := s+#13#10+
 						'- "'+match.Token+'" ('+match.Pattern+dictionaryName+') - '+Format('%.5f bits', [match.Entropy]);

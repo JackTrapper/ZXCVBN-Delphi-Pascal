@@ -4,9 +4,14 @@ interface
 
 {
 	zxcvbn is a password strength estimator inspired by password crackers.
-	Through pattern matching and conservative estimation, it recognizes and weighs 30k common passwords,
-	common names and surnames according to US census data, popular English words from Wikipedia
-	and US television and movies, and other common patterns like
+
+	Through pattern matching and conservative estimation, it recognizes and weighs:
+
+		- 30k common passwords
+		- common names and surnames according to US census data
+		- popular English words from Wikipedia and US television and movies
+
+	and other common patterns like:
 
 		- dates
 		- repeats (aaa)
@@ -45,13 +50,18 @@ interface
 		res.CrackTimeOfflineSlowHash
 		res.CrackTimeOfflineFastHash
 
-		res.Score           // (0..4) Useful for implementing a strength bar
-								  // - 0: guesses <  10k
-								  // - 1: guesses  < 10M
-								  // - 2: guesses  < 1B
-								  // - 3: guesses  < 100B
-								  // - 4: guesses >= 100B
-		res.ScoreDisplay    // text description that of the score
+		res.Score           (0..4) Useful for implementing a strength bar
+										- 0: guesses  < 10k
+										- 1: guesses  < 10M
+										- 2: guesses  < 1B
+										- 3: guesses  < 100B
+										- 4: guesses >= 100B
+		res.ScoreText       // text description that of the score
+										- 0: Too guessable; risky password.
+										- 1: Very guessable; protection from throttled online attacks.
+										- 2: Somewhat guessable; protection from unthrottled online attacks.
+										- 3: Safely unguessable; moderate protection from offline slow-hash scenario.
+										- 4: Very unguessable; strong protection from offline slow-hash scenario.
 
 		res.WarningText     // text that can be used to tell the user what they did wrong
 		res.SuggestionsText // list of suggestions the user can take to improve the password
@@ -61,9 +71,7 @@ interface
 
 	A good requirement is for an Offline slow hash (e.g. bcrypt, scrypt, argon2) to take 25 years to crack:
 
-		res.CrackTimeOfflineSlowHash > 788923800 // 788923800 seconds = 25 years
-		res.Guesses > 7.889238E12                // 7.889238E12 guesses = 25 years * 10000/sec
-		res.GuessesLog10 > 12.897                // 12.897 = Log10(7.889238E12)
+		passwordIsGood := (res.CrackTimeOfflineSlowHash >= 788923800); // 788923800 seconds = 25 years
 
 
 	Example password crack times
@@ -186,7 +194,7 @@ type
 		/// </summary>
 		/// <param name="AUserInputs">List of per-password user information for this invocation</param>
 		/// <returns>A list of <see cref="IZxcvbnMatcher"/> objects that will be used to pattern match this password</returns>
-		function CreateMatchers(const AUserInputs: TStringList): TList<IZxcvbnMatcher>;
+		function CreateMatchers(const AUserInputs: TStrings): TList<IZxcvbnMatcher>;
 	end;
 
 	/// <summary>
@@ -219,14 +227,7 @@ type
 
 		function GetLongestMatch(const AMatchSequence: TList<TZxcvbnMatch>): TZxcvbnMatch;
 		procedure GetMatchFeedback(const AMatch: TZxcvbnMatch; AIsSoleMatch: Boolean; LocaleName: string; out WarningText: string; out SuggestionsText: string);
-	public
-		/// <summary>
-		/// Create a new instance of Zxcvbn with the default matchers.
-		/// </summary>
-		/// <param name="ADictionariesPath">Path where to look for dictionary files (if not embedded in resources)</param>
-		/// <param name="ATranslation">The language in which the strings are returned</param>
-		constructor Create(ADictionariesPath: string = ''); overload;
-
+	protected
 		/// <summary>
 		/// Create an instance of Zxcvbn that will use the given matcher factory to create matchers to use
 		/// to find password weakness.
@@ -234,6 +235,13 @@ type
 		/// <param name="AMatcherFactory">The factory used to create the pattern matchers used</param>
 		/// <param name="ATranslation">The language in which the strings are returned</param>
 		constructor Create(AMatcherFactory: IZxcvbnMatcherFactory); overload;
+	public
+		/// <summary>
+		/// Create a new instance of Zxcvbn with the default matchers.
+		/// </summary>
+		/// <param name="ADictionariesPath">Path where to look for dictionary files (if not embedded in resources)</param>
+		/// <param name="ATranslation">The language in which the strings are returned</param>
+		constructor Create; overload;
 
 		/// <summary>
 		/// <para>Perform the password matching on the given password and user inputs, returing the result structure with information
@@ -244,7 +252,7 @@ type
 		/// <param name="APassword">Password</param>
 		/// <param name="AUserInputs">Optionally, a string list of user data</param>
 		/// <returns>Result for lowest entropy match</returns>
-		function EvaluatePassword(const APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
+		function EvaluatePassword(const APassword: string; AUserInputs: TStrings=nil): TZxcvbnResult;
 
 		/// <summary>
 		/// <para>A class function to match a password against the default matchers without having to create
@@ -256,7 +264,7 @@ type
 		/// <param name="ADictionariesPath">optionally, dictionary files path</param>
 		/// <param name="AUserInputs">optionally, the user inputs list</param>
 		/// <returns>The results of the password evaluation</returns>
-		class function MatchPassword(const APassword: string; ADictionariesPath: string = ''; AUserInputs: TStringList = nil): TZxcvbnResult;
+		class function MatchPassword(const APassword: string; AUserInputs: TStrings=nil): TZxcvbnResult;
 
 		property LocaleName: string read FLocaleName write FLocaleName;
 	end;
@@ -269,6 +277,8 @@ type
 	/// in which they are created.</para>
 	/// </summary>
 	TZxcvbnMatch = class
+	private
+		function GetGuessesLog10: Real;
 	protected
 		procedure GetMatchFeedback(AIsSoleMatch: Boolean; LocaleName: string; out WarningText: string; out SuggestionsText: string); virtual;
 	public
@@ -290,6 +300,8 @@ type
 		destructor Destroy; override;
 
 		function Clone: TZxcvbnMatch;
+
+		property GuessesLog10: Real read GetGuessesLog10;
 	end;
 
 	/// <summary>
@@ -421,8 +433,11 @@ type
 		procedure CopyTo(AMatch: TZxcvbnL33tMatch);
 	end;
 
-function CompressString(const s: string): string;
-function DecompressString(const s: string): string;
+	function CompressString(const s: string): string;
+	function DecompressString(const s: string): string;
+
+	procedure BuildFrequencyLists(DataPath: string; OutputFilename: string='Zxcvbn_FrequencyLists.inc');
+
 
 implementation
 
@@ -432,8 +447,10 @@ uses
 	System.RegularExpressions,
 	System.Types,
 	System.StrUtils,
+	System.IOUtils,
 	Winapi.Windows,
 	ZLibEx;
+
 
 function GetLocaleStrEx(LocaleName: string; LocaleType: Integer; Default: string): string;
 var
@@ -676,6 +693,53 @@ begin
 	finally
 		rs.Free;
 	end;
+end;
+
+function GetCompressedWordList(ADictionaryName: string): TStrings;
+var
+	comp: string;
+	sl: TStrings;
+{$INCLUDE Zxcvbn_FrequencyLists.inc}
+{
+const
+	Senglish_wikipedia	= '[base85 compressed lf separated words]';
+	Sfemale_names			= '[base85 compressed lf separated words]';
+	Smale_names				= '[base85 compressed lf separated words]';
+	Spasswords				= '[base85 compressed lf separated words]';
+	Ssurnames				= '[base85 compressed lf separated words]';
+	Sus_tv_and_film		= '[base85 compressed lf separated words]';
+}
+
+begin
+	Result := nil;
+	comp := '';
+
+{$IFDEF zxcvbn-fl}
+	if SameText(ADictionaryName, 'us_tv_and_film') then
+		comp := Sus_tv_and_film
+	else if SameText(ADictionaryName, 'english_wikipedia') then
+		comp := Senglish_wikipedia
+	else if SameText(ADictionaryName, 'passwords') then
+		comp := Spasswords
+	else if SameText(ADictionaryName, 'surnames') then
+		comp := Ssurnames
+	else if SameText(ADictionaryName, 'male_names') then
+		comp := Smale_names
+	else if SameText(ADictionaryName, 'female_names') then
+		comp := Sfemale_names
+	else
+		Exit;
+{$ENDIF}
+
+
+	comp := DecompressString(comp);
+	if comp = '' then
+		Exit;
+
+	sl := TStringList.Create;
+	sl.Text := comp;
+
+	Result := sl;
 end;
 
 procedure BurnString(var s: UnicodeString);
@@ -1070,7 +1134,7 @@ type
 
 		procedure CalculateEntropyForMatch(AMatch: TZxcvbnDictionaryMatch);
 		function BuildRankedDictionary(AWordListFile: string): TDictionary<string, Integer>; overload;
-		function BuildRankedDictionary(AWordList: TStringList): TDictionary<string, Integer>; overload;
+		function BuildRankedDictionary(AWordList: TStrings): TDictionary<string, Integer>; overload;
 	public
 		/// <summary>
 		/// Creates a new dictionary matcher. <paramref name="AWordListPath"/> must be the path (relative or absolute) to a file containing one word per line,
@@ -1084,7 +1148,7 @@ type
 		/// Creates a new dictionary matcher from the passed in word list. If there is any frequency order then they should be in
 		/// decreasing frequency order.
 		/// </summary>
-		constructor Create(AName: string; AWordList: TStringList); overload;
+		constructor Create(AName: string; AWordList: TStrings); overload;
 
 		destructor Destroy; override;
 
@@ -1154,7 +1218,7 @@ type
 	end;
 
 	/// <summary>
-	/// <para>This matcher attempts to guess dates, with and without date separators. e.g. 1197 (could be 1/1/97) through to 18/12/2015.</para>
+	/// <para>This matcher attempts to guess dates, with and without date separators. E.g. 1197 (could be 1/1/97) through to 18/12/2015.</para>
 	///
 	/// <para>The format for matching dates is quite particular, and only detected years in the range 00-99 and 1000-2050 are considered by
 	/// this matcher.</para>
@@ -1196,14 +1260,10 @@ type
 	TZxcvbnDefaultMatcherFactory = class(TInterfacedObject, IZxcvbnMatcherFactory)
 	private
 		FMatchers: TList<IZxcvbnMatcher>;
-		FDictionaryMatchers: TList<IZxcvbnMatcher>;
 		FCustomMatchers: TList<IZxcvbnMatcher>;
 	public
-		/// <summary>
-		/// Create a matcher factory that uses the default list of pattern matchers
-		/// </summary>
-		constructor Create(ADictionariesPath: string);
-
+		/// <summary>Create a matcher factory that uses the default list of pattern matchers</summary>
+		constructor Create;
 		destructor Destroy; override;
 
 		/// <summary>
@@ -1211,7 +1271,7 @@ type
 		/// </summary>
 		/// <param name="AUserInputs">string list of user information</param>
 		/// <returns>List of matchers to use</returns>
-		function CreateMatchers(const AUserInputs: TStringList): TList<IZxcvbnMatcher>;
+		function CreateMatchers(const AUserInputs: TStrings): TList<IZxcvbnMatcher>;
 	end;
 
 type
@@ -1363,16 +1423,11 @@ type
 	/// </summary>
 	TZxcvbnSequenceMatcher = class(TInterfacedObject, IZxcvbnMatcher)
 	private
-
-	// Sequences should not overlap, sequences here must be ascending, their reverses will be checked automatically
-			const
-		Sequences: array [0 .. 2] of string = ('abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '01234567890');
-
-	const
-		SequenceNames: array [0 .. 2] of string = ('lower', 'upper', 'digits');
-
-	const
-		SequencePattern = 'sequence';
+		// Sequences should not overlap, sequences here must be ascending, their reverses will be checked automatically
+		const
+			Sequences: array [0 .. 2] of string = ('abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '01234567890');
+			SequenceNames: array [0 .. 2] of string = ('lower', 'upper', 'digits');
+			SequencePattern = 'sequence';
 	private
 		function CalculateEntropy(AMatch: string; AAscending: Boolean): Double;
 	public
@@ -1388,9 +1443,9 @@ type
 
 	{ TZxcvbn }
 
-constructor TZxcvbn.Create(ADictionariesPath: string = '');
+constructor TZxcvbn.Create;
 begin
-	Create(TZxcvbnDefaultMatcherFactory.Create(ADictionariesPath));
+	Create(TZxcvbnDefaultMatcherFactory.Create);
 end;
 
 constructor TZxcvbn.Create(AMatcherFactory: IZxcvbnMatcherFactory);
@@ -1444,9 +1499,7 @@ begin
 				Continue;
 
 			if (match.i <= 0) then
-			begin
-				candidate_entropy := match.Entropy;
-			end
+				candidate_entropy := match.Entropy
 			else
 				candidate_entropy := minimumEntropyToIndex[match.i - 1] + match.Entropy;
 
@@ -1615,7 +1668,7 @@ begin
 		AMatch.GetMatchFeedback(AIsSoleMatch, LocaleName, {out}WarningText, {out}SuggestionsText);
 end;
 
-function TZxcvbn.EvaluatePassword(const APassword: string; AUserInputs: TStringList = nil): TZxcvbnResult;
+function TZxcvbn.EvaluatePassword(const APassword: string; AUserInputs: TStrings=nil): TZxcvbnResult;
 var
 	matches: TList<TZxcvbnMatch>;
 	Matcher: IZxcvbnMatcher;
@@ -1643,11 +1696,11 @@ begin
 	Result := res;
 end;
 
-class function TZxcvbn.MatchPassword(const APassword: string; ADictionariesPath: string = ''; AUserInputs: TStringList = nil): TZxcvbnResult;
+class function TZxcvbn.MatchPassword(const APassword: string; AUserInputs: TStrings=nil): TZxcvbnResult;
 var
 	zx: TZxcvbn;
 begin
-	zx := TZxcvbn.Create(ADictionariesPath);
+	zx := TZxcvbn.Create;
 	try
 		Result := zx.EvaluatePassword(APassword, AUserInputs);
 	finally
@@ -1657,46 +1710,60 @@ end;
 
 { TZxcvbnDefaultMatcherFactory }
 
-constructor TZxcvbnDefaultMatcherFactory.Create(ADictionariesPath: string);
+constructor TZxcvbnDefaultMatcherFactory.Create;
+var
+	dictionaryMatchers: TList<IZxcvbnMatcher>;
 begin
 	FMatchers := TList<IZxcvbnMatcher>.Create;
-	FDictionaryMatchers := TList<IZxcvbnMatcher>.Create;
 	FCustomMatchers := TList<IZxcvbnMatcher>.Create;
 
-	FDictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('passwords', ADictionariesPath + 'passwords.lst'));
-	FDictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('english', ADictionariesPath + 'english.lst'));
-	FDictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('male_names', ADictionariesPath + 'male_names.lst'));
-	FDictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('female_names', ADictionariesPath + 'female_names.lst'));
-	FDictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('surnames', ADictionariesPath + 'surnames.lst'));
+	dictionaryMatchers := TList<IZxcvbnMatcher>.Create;
+	try
+		dictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('us_tv_and_film', 		'us_tv_and_film.lst'));
+		dictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('english_wikipedia',	'english_wikipedia.lst'));
+		dictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('passwords',				'passwords.lst'));
+		dictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('surnames',				'surnames.lst'));
+		dictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('male_names',				'male_names.lst'));
+		dictionaryMatchers.Add(TZxcvbnDictionaryMatcher.Create('female_names',			'female_names.lst'));
+
+		FMatchers.AddRange(dictionaryMatchers);
+
+		//The 1337-speak matches is based off words from the dictionaries.
+		FMatchers.Add(TZxcvbnL33tMatcher.Create(dictionaryMatchers));
+	finally
+		dictionaryMatchers.Free;
+	end;
+
+	//Other matches that are standalone; don't depend on dictionaries.
 	FMatchers.Add(TZxcvbnRepeatMatcher.Create);
 	FMatchers.Add(TZxcvbnSequenceMatcher.Create);
-	FMatchers.Add(TZxcvbnRegexMatcher.Create('\d{3,}', 10, True, 'digits'));
-	FMatchers.Add(TZxcvbnRegexMatcher.Create('19\d\d|200\d|201\d', 119, False, 'year'));
+	FMatchers.Add(TZxcvbnRegexMatcher.Create('\d{3,}', 10, True, 'digits')); //each digit is 10 possible values for each digit
+	FMatchers.Add(TZxcvbnRegexMatcher.Create('19\d\d|200\d|201\d', 119, False, 'year')); //1900-2019 is a fixed 119 possible values (119 possible years)
 	FMatchers.Add(TZxcvbnDateMatcher.Create);
 	FMatchers.Add(TZxcvbnSpatialMatcher.Create);
-	FMatchers.Add(TZxcvbnL33tMatcher.Create(FDictionaryMatchers));
 end;
 
 destructor TZxcvbnDefaultMatcherFactory.Destroy;
 begin
-	FMatchers.Free;
-	FDictionaryMatchers.Free;
+	FreeAndNil(FMatchers);
 	FCustomMatchers.Clear;
 	FCustomMatchers.Free;
 	inherited;
 end;
 
-function TZxcvbnDefaultMatcherFactory.CreateMatchers(const AUserInputs: TStringList): TList<IZxcvbnMatcher>;
+function TZxcvbnDefaultMatcherFactory.CreateMatchers(const AUserInputs: TStrings): TList<IZxcvbnMatcher>;
 var
 	userInputDict: IZxcvbnMatcher;
 begin
 	FCustomMatchers.Clear;
 	FCustomMatchers.AddRange(FMatchers);
-	FCustomMatchers.AddRange(FDictionaryMatchers);
 
-	userInputDict := TZxcvbnDictionaryMatcher.Create('user_inputs', AUserInputs);
-	FCustomMatchers.Add(userInputDict);
-	FCustomMatchers.Add(TZxcvbnL33tMatcher.Create(userInputDict));
+	if AUserInputs <> nil then
+	begin
+		userInputDict := TZxcvbnDictionaryMatcher.Create('user_inputs', AUserInputs);
+		FCustomMatchers.Add(userInputDict);
+		FCustomMatchers.Add(TZxcvbnL33tMatcher.Create(userInputDict));
+	end;
 
 	Result := FCustomMatchers;
 end;
@@ -1825,14 +1892,33 @@ end;
 
 destructor TZxcvbnMatch.Destroy;
 begin
-	BurnString({var}Self.Token); // burn even the portion of the user's password
+	BurnString({var}Self.Token); // Burn even a portion of the user's password. It shouldn't even be a string! (it should be a SecureString)
 
 	inherited;
 end;
 
+function TZxcvbnMatch.GetGuessesLog10: Real;
+var
+	guesses: Real;
+begin
+	guesses := Power(2, Self.Entropy);
+
+	Result := Log10(guesses);
+end;
+
 procedure TZxcvbnMatch.GetMatchFeedback(AIsSoleMatch: Boolean; LocaleName: string; out WarningText, SuggestionsText: string);
 begin
-	WarningText := '';
+{
+	Each descendant Match class gives its own warnings and suggestions.
+
+	For example, the Sequence matcher might say:
+
+		Warning:    Straight rows of keys are easy to guess
+		Suggestion: Avoid sequences
+
+	This virtual ancestor match defaults to nothing.
+}
+	WarningText     := '';
 	SuggestionsText := '';
 end;
 
@@ -2211,7 +2297,7 @@ begin
 	FRankedDictionary := BuildRankedDictionary(AWordListPath);
 end;
 
-constructor TZxcvbnDictionaryMatcher.Create(AName: string; AWordList: TStringList);
+constructor TZxcvbnDictionaryMatcher.Create(AName: string; AWordList: TStrings);
 var
 	wordListToLower: TStringList;
 	i: Integer;
@@ -2240,26 +2326,61 @@ end;
 
 function TZxcvbnDictionaryMatcher.BuildRankedDictionary(AWordListFile: string): TDictionary<string, Integer>;
 var
-	lines: TStringList;
+	lines: TStrings;
+	resName: string;
 begin
-	// Look first to wordlists embedded in assembly (i.e. default dictionaries) otherwise treat as file path
+	{
+		Look first to wordlists embedded in assembly (i.e. default dictionaries) otherwise treat as file path
 
-	lines := GetEmbeddedResourceLines(Format('ZxcvbnDictionaries_%s', [ChangeFileExt(AWordListFile, '')]));
+		Examples of dictionary names are:
+			- us_tv_and_film		//top 30,000
+			- english_wikipedia	//top 30,000
+			- passwords				//top 30,000
+			- surnames				//top 10,000
+			- male_names
+			- female_names
+	}
+	Result := nil;
+
 	try
-		if not Assigned(lines) then
+		//Assume resources are one-per-line RCDATA
+		resName := Format('ZxcvbnDictionaries_%s', [ChangeFileExt(AWordListFile, '')]);
+		lines := GetEmbeddedResourceLines(resName);
+		if Assigned(lines) then
 		begin
-			lines := TStringList.Create;
-			lines.LoadFromFile(AWordListFile);
+			Result := BuildRankedDictionary(lines);
+			Exit;
 		end;
 
-		Result := BuildRankedDictionary(lines);
+		//Try looking for a file
+		if FileExists(AWordListFile) then
+		begin
+			lines := TStringList.Create;
+			try
+				lines.LoadFromFile(AWordListFile);
+				Result := BuildRankedDictionary(lines);
+				Exit;
+			except
+				FreeAndNil(lines);
+			end;
+		end;
+
+		//Use the compressed in-box
+		lines := GetCompressedWordList(ChangeFileExt(AWordListFile, ''));
+		if Assigned(lines) then
+		begin
+			Result := BuildRankedDictionary(lines);
+			Exit;
+		end;
+
+		raise Exception.CreateFmt('Could not load word list "%s"', [AWordListFile]);
 	finally
 		if Assigned(lines) then
 			lines.Free;
 	end;
 end;
 
-function TZxcvbnDictionaryMatcher.BuildRankedDictionary(AWordList: TStringList): TDictionary<string, Integer>;
+function TZxcvbnDictionaryMatcher.BuildRankedDictionary(AWordList: TStrings): TDictionary<string, Integer>;
 var
 	dict: TDictionary<string, Integer>;
 	i: Integer;
@@ -2268,8 +2389,8 @@ begin
 
 	for i := 0 to AWordList.Count - 1 do
 	begin
-		// The word list is assumed to be in increasing frequency order
-		dict.Add(AWordList[i], i + 1);
+		// The word list is assumed to be in decreasing frequency order
+		dict.Add(AWordList[i], i+1);
 	end;
 
 	Result := dict;
@@ -3153,8 +3274,8 @@ begin
 
 		while (lastIndex < APassword.Length) do
 		begin
-			greedyMatch := greedy.match(APassword, lastIndex, APassword.Length - lastIndex + 1);
-			lazyMatch := lazy.match(APassword, lastIndex, APassword.Length - lastIndex + 1);
+			greedyMatch := greedy.match(APassword, lastIndex, APassword.Length-lastIndex + 1);
+			lazyMatch   := lazy.match(  APassword, lastIndex, APassword.Length-lastIndex + 1);
 			if not greedyMatch.Success then
 				Break;
 
@@ -3258,7 +3379,7 @@ end;
 procedure TZxcvbnSequenceMatch.GetMatchFeedback(AIsSoleMatch: Boolean; LocaleName: string;
 		out WarningText, SuggestionsText: string);
 begin
-	WarningText := GetWarning(zwSequenceAbcEasy, LocaleName);
+	WarningText :=     GetWarning(zwSequenceAbcEasy, LocaleName);
 	SuggestionsText := GetSuggestion(zsAvoidSequences, LocaleName);
 
 	// todo: add support for recent_year
@@ -3469,6 +3590,7 @@ begin
 		Encode;
 end;
 
+/// <summary> Decode a base85 encoded data into bytes </summary>
 function Decode85(const s: string): RawByteString;
 var
 	c: Char;
@@ -3542,8 +3664,8 @@ begin
 	end;
 
 	data := Utf8String(s); // convert to utf8
-	comp := ZCompressStr(data);
-	Result := Encode85(comp, True);
+	comp := ZLibEx.ZCompressStr(data);
+	Result := Encode85(comp, False);
 end;
 
 function DecompressString(const s: string): string;
@@ -3558,6 +3680,84 @@ begin
 
 	comp := Decode85(s);
 	Result := string(ZDecompressStr(comp));
+end;
+
+procedure BuildFrequencyLists(DataPath: string; OutputFilename: string='Zxcvbn_FrequencyLists.inc');
+var
+	s: string;
+
+	function GetZB64File(AFilePath: string): string;
+	var
+		comp: string;
+	begin
+		comp := TFile.ReadAllText(AFilePath);
+		comp := CompressString(comp);
+		//comp := DecompressString(Result);
+
+		Result := '';
+		while Length(comp) > 0 do
+		begin
+			if Result <> '' then
+					Result := Result+#13#10;
+			Result := Result+'		'+QuotedStr(Copy(comp, 1, 120));
+			Delete(comp, 1, 120);
+			if comp <> '' then
+				Result := Result+'+'
+			else
+				Result := Result+';';
+		end;
+	end;
+
+begin
+	{
+		Parse the files in DataPath, e.g.:
+
+			english_wikipedia.txt
+			female_names.txt
+			male_names.txt
+			passwords.txt
+			surnames.txt
+			us_tv_and_film.txt
+
+		And do the same thing as build_frequency_lists.py
+		https://github.com/dropbox/zxcvbn/blob/master/data-scripts/build_frequency_lists.py
+
+	To convert them into a Zxcvbn_FrequencyLists.inc include file:
+
+	//Generated by BuildFrequencyLists
+	const
+		Senglish_wikipedia = 'base85';
+		Sfemale_names = 'base85';
+		Smale_names = 'base85';
+		Spasswords = 'base85';
+		Ssurnames = 'base85';
+		Sus_tv_and_film = 'base85';
+}
+	if DataPath = '' then
+		DataPath := 'D:\Develop\GitHub\ZXCVBN-Delphi-Pascal\dict\Filtered\';
+
+	DataPath := IncludeTrailingPathDelimiter(DataPath);
+
+	s :=
+		'//'+#13#10+
+		'//This code was generated by a tool'+#13#10+
+		'//'+#13#10+
+		'const'+#13#10+
+		'	Senglish_wikipedia = '+	#13#10+GetZB64File(DataPath+'english_wikipedia.lst')+#13#10+#13#10+
+
+		'	Sfemale_names = '+		#13#10+GetZB64File(DataPath+'female_names.lst')+#13#10+#13#10+
+
+		'	Smale_names = '+			#13#10+GetZB64File(DataPath+'male_names.lst')+#13#10+#13#10+
+
+		'	Spasswords = '+			#13#10+GetZB64File(DataPath+'passwords.lst')+#13#10+#13#10+
+
+		'	Ssurnames  = '+			#13#10+GetZB64File(DataPath+'surnames.lst')+#13#10+#13#10+
+
+		'	Sus_tv_and_film = '+		#13#10+GetZB64File(DataPath+'us_tv_and_film.lst')+#13#10+#13#10+
+
+		'{$DEFINE zxcvbn-fl}';
+
+	TFile.WriteAllText(OutputFilename, s);
 end;
 
 end.

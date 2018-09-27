@@ -78,6 +78,7 @@ object MainForm: TMainForm
       'cLbTyv2t'
       'Tr0ub4dor&3'
       'Tr0ub4dour&3'
+      'aDm1n!str@t0r'
       'hunter2')
   end
   object cbLocaleName: TComboBox
